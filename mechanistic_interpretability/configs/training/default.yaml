@@ -1,0 +1,16 @@
+# SAE Training Hyperparameters
+name: "sae_training"
+
+# Learning rate for the SAE. Usually higher than LLM training (e.g., 1e-3 or 2e-4)
+learning_rate: 0.001
+
+# SAEs generally do not use weight decay, as we want the weights to freely scale 
+# before the unit norm constraint snaps them back.
+weight_decay: 0.0
+
+# Number of times to loop over the entire cached activation dataset
+num_epochs: 1
+
+# Logging and evaluation intervals (in steps/batches)
+log_interval: 100
+save_interval: 5000

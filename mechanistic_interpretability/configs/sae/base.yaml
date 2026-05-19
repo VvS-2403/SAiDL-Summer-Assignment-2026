@@ -1,0 +1,14 @@
+# Sparse Autoencoder Architecture Configuration
+name: "top_k_sae"
+
+# The multiplier for the hidden dimension. 
+# distilgpt2 has d_model=768. An expansion of 4 gives the SAE 3072 neurons to work with.
+expansion_factor: 4
+
+# The exact number of neurons allowed to fire (be non-zero) per token.
+# Lower k forces stricter monosemanticity but might hurt reconstruction.
+k: 32
+
+# Normalization settings
+normalize_decoder: true
+epsilon: 1e-8

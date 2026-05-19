@@ -1,0 +1,6 @@
+name: "distilgpt2"
+pretrained_path: "distilgpt2"
+torch_dtype: "float32"
+output_hidden_states: true
+use_auth_token: false
+cache_dir: "${hydra:runtime.cwd}/mechanistic_interpretability/checkpoints/hf_cache"

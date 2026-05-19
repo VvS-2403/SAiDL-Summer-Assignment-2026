@@ -1,0 +1,3 @@
+name: "sinusoidal"
+max_len: 1024
+base: 10000

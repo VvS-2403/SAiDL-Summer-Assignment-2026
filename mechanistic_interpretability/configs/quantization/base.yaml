@@ -1,0 +1,9 @@
+method: "uniform_affine" # Options: uniform_affine, uniform_symmetric, none
+bits: 8                 # Options: 4, 8, 16, 32 (32/16 mean unquantized baseline)
+per_channel: false      # true for per-channel scaling factor, false for per-tensor
+signed: false           # unsigned int (0 to 255) vs signed int (-128 to 127)
+
+# Calibration parameters to map float ranges to integer ranges safely
+calibration:
+  strategy: "min_max"   # Options: min_max, percentile, moving_average
+  percentile: 99.99     # Only used if strategy is 'percentile'

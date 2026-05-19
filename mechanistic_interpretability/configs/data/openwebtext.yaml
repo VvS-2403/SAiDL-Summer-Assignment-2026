@@ -1,0 +1,10 @@
+name: "openwebtext"
+split: "train"
+streaming: true
+max_samples: 100000
+cache_dir: "${hydra:runtime.cwd}/mechanistic_interpretability/data/cache"
+save_samples_dir: "${hydra:runtime.cwd}/mechanistic_interpretability/data/samples"
+
+# Tokenizer settings strictly aligned with the target model
+tokenizer: "distilgpt2"
+add_bos_token: true

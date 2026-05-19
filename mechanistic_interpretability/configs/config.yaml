@@ -1,0 +1,19 @@
+defaults:
+  - data: openwebtext
+  - model: distilgpt2
+  - quantization: base
+  - sae: base
+  - training: default
+  - _self_
+
+experiment_name: "sae_distilgpt2_layer3"
+seed: 42
+output_dir: "${hydra:runtime.output_dir}"
+
+# Global Pipeline Parameters
+pipeline:
+  target_layer: 3
+  d_model: 768
+  max_seq_len: 128
+  batch_size: 64
+  device: "cuda"
