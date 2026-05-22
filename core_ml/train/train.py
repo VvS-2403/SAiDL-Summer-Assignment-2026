@@ -18,9 +18,9 @@ from core_ml.models.ffn import FeedForward
 from core_ml.models.attention.vanilla_attention import MultiHeadAttention
 from core_ml.models.attention.sliding_window import SlidingWindowAttention
 from core_ml.models.attention.gqa import GroupedQueryAttention
-from core_ml.models.positional.sinusoidal import SinusoidalPositionalEncoding
-from core_ml.models.positional.rope import RotaryPositionalEmbedding
-from core_ml.models.positional.alibi import ALiBiPositionalBias
+from core_ml.models.positional.Sinusoidal import SinusoidalPositionalEncoding 
+from core_ml.models.positional.Rope import RotaryPositionalEmbedding  # ✅
+from core_ml.models.positional.Alibi import ALiBiPositionalBias  # ✅
 
 def build_model(cfg: DictConfig) -> nn.Module:
     """

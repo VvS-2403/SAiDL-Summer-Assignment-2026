@@ -140,6 +140,8 @@ class Trainer:
                             "val/loss":       val_loss,
                             "val/perplexity": val_ppl,
                             "global_step":    self.global_step,
+                            # In the log block inside train(), add:
+                            "epoch": epoch,
                         })
                         
                         # Save checkpoint if it's the best model so far
