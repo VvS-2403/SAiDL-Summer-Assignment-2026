@@ -75,18 +75,18 @@ def main(cfg: DictConfig):
     
     # 2. Initialize Weights & Biases
     wandb.init(
-        project="SAiDL-Core-ML",
-        name=f"{cfg.experiment_name}_{cfg.attention.name}_{cfg.positional.name}",
-        config=OmegaConf.to_container(cfg, resolve=True)
+    project="SAiDL-Core-ML",
+    name=f"{cfg.experiment_name}_{cfg.attention.name}_{cfg.positional.name}",
+    config=OmegaConf.to_container(cfg, resolve=True),
+    tags=[cfg.attention.name, cfg.positional.name],   # ADD: enables filtering runs
+    notes="Baseline sweep over attention variants"     # ADD: documents the run
     )
-    
     # 3. Prepare Data
     train_loader, val_loader = prepare_dataloaders(cfg)
     
     # 4. Build Model
     model = build_model(cfg).to(device)
-    print(f"Total Parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.2f} M")
-    
+    wandb.watch(model, log="gradients", log_freq=200)   # ADD: tracks gradient histograms per layer
     # 5. Initialize Optimizer and Scheduler
     optimizer = optim.AdamW(
         model.parameters(), 
