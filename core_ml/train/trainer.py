@@ -119,15 +119,15 @@ class Trainer:
                         true_loss = loss.item() * self.config.training.gradient_accumulation_steps
 
                         wandb.log({
-                            "train/loss":           true_loss,
-                            "train/perplexity":     math.exp(true_loss),
-                            "train/lr":             self.scheduler.get_last_lr()[0],
-                            "train/grad_norm":      grad_norm,
-                            "train/tokens_per_sec": tokens_per_sec,
-                            "system/gpu_memory_mb": gpu_memory_mb,
-                            "epoch":                epoch + 1,
-                            "global_step":          self.global_step,
-                        })
+                        "train/loss":           true_loss,
+                        "train/perplexity":     math.exp(true_loss),
+                        "train/lr":             self.scheduler.get_last_lr()[0],
+                        "train/grad_norm":      grad_norm,
+                        "train/tokens_per_sec": tokens_per_sec,
+                        "train/gpu_memory_mb":  gpu_memory_mb,
+                        "epoch":                epoch + 1,
+                        "global_step":          self.global_step,
+                            }, step=self.global_step)
                         progress_bar.set_postfix({
                             'loss': f"{true_loss:.4f}",
                             'tok/s': f"{tokens_per_sec:.0f}",
