@@ -15,7 +15,7 @@ from core_ml.models.blocks import TransformerBlock
 from core_ml.models.ffn import FeedForward
 
 # Attention variants
-from core_ml.models.attention.vanilla_attention import MultiHeadAttention
+from core_ml.models.attention.vanilla_attention import Mul
 from core_ml.models.attention.sliding_window import SlidingWindowAttention
 from core_ml.models.attention.gqa import GroupedQueryAttention
 
