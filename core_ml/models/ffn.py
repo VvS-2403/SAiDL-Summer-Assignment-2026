@@ -1,44 +1,39 @@
 import torch
 import torch.nn as nn
+import math
+import wandb
 
 class FeedForward(nn.Module):
-    """
-    A standard Position-wise Feed-Forward Network (FFN) with a GELU activation.
-    Acts as a massive key-value memory bank for the Transformer.
-    """
-    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.1):
-        """
-        Args:
-            d_model (int): The embedding dimension (e.g., 512).
-            d_ff (int): The hidden expansion dimension, usually 4x d_model (e.g., 2048).
-            dropout (float): Dropout probability applied after the activation.
-        """
+    # Change 6: Pass n_layers into the signature
+    def __init__(self, d_model, d_ff, n_layers, dropout=0.1):
         super().__init__()
-        
-        # Project up to a higher dimensional space
         self.linear_1 = nn.Linear(d_model, d_ff)
-        
-        # Gaussian Error Linear Unit (standard for modern LLMs like GPT-2)
-        self.activation = nn.GELU()
-        
-        self.dropout = nn.Dropout(dropout)
-        
-        # Project back down to the residual stream dimension
+        self.act = nn.GELU()
         self.linear_2 = nn.Linear(d_ff, d_model)
+        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, seq_len, d_model).
-        Returns:
-            torch.Tensor: Output tensor of shape (batch_size, seq_len, d_model).
-        """
-        # x shape: (batch_size, seq_len, d_model) -> (batch_size, seq_len, d_ff)
-        x = self.linear_1(x)
-        x = self.activation(x)
-        x = self.dropout(x)
+        # Change 2: Fix linear_1 weight initialization
+        nn.init.normal_(self.linear_1.weight, mean=0.0, std=0.02)
+        nn.init.zeros_(self.linear_1.bias)
+
+        # Change 1: Fix linear_2 scaled initialization
+        # The GPT-2 scale factor prevents variance explosion in the residual stream
+        nn.init.normal_(self.linear_2.weight, mean=0.0, std=0.02 / math.sqrt(2 * n_layers))
+        nn.init.zeros_(self.linear_2.bias)
         
-        # x shape: (batch_size, seq_len, d_ff) -> (batch_size, seq_len, d_model)
-        x = self.linear_2(x)
+        # We will use these to temporarily store stats for WandB logging
+        self.inter_mean = 0.0
+        self.inter_std = 0.0
+
+    def forward(self, x):
+        x_inter = self.act(self.linear_1(x))
         
-        return x
+        # Change 4: Check for GELU saturation
+        # Storing stats locally rather than calling wandb.log() here to prevent 
+        # severe training slowdowns (calling API 6x per forward pass is too slow).
+        if self.training:
+            with torch.no_grad(): # Don't track gradients for logging metrics
+                self.inter_mean = x_inter.mean().item()
+                self.inter_std = x_inter.std().item()
+
+        return self.dropout(self.linear_2(x_inter))

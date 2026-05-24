@@ -21,26 +21,18 @@ class Transformer(nn.Module):
         positional_encoding: nn.Module,
         dropout: float = 0.1,
     ):
-        """
-        Args:
-            vocab_size (int): Size of the tokenizer's vocabulary (e.g., 50257).
-            d_model (int): The hidden embedding dimension.
-            blocks (list of nn.Module): A pre-instantiated list of TransformerBlocks.
-            positional_encoding (nn.Module): The instantiated positional encoding module.
-                                             Pass nn.Identity() for ALiBi.
-            dropout (float): Dropout probability for embeddings.
-        """
         super().__init__()
 
         # 1. Token Embedding Matrix
         self.token_embedding = nn.Embedding(vocab_size, d_model)
 
         # 2. Positional Encoding (Injected)
-        #    nn.Identity() is a safe no-op for ALiBi — x = Identity(x) = x
         self.positional_encoding = positional_encoding
         self.dropout = nn.Dropout(dropout)
 
         # 3. The Core Network
+        # (Note: Since blocks are pre-instantiated, the n_layers parameter must 
+        # be passed into them in the script where this list is created!)
         self.blocks = nn.ModuleList(blocks)
 
         # 4. Final LayerNorm (Crucial for Pre-LN architectures)
@@ -51,6 +43,11 @@ class Transformer(nn.Module):
 
         # Weight Tying (GPT-2 standard): shares the embedding and unembedding matrices
         self.token_embedding.weight = self.lm_head.weight
+
+        # CRITICAL FIX: GPT-2 scaled initialization for embeddings.
+        # PyTorch defaults to N(0, 1) for embeddings, which causes a massive initial loss spike.
+        # Since weights are tied, this single line initializes BOTH the embedding and lm_head.
+        nn.init.normal_(self.token_embedding.weight, mean=0.0, std=0.02)
 
     def forward(
         self,
@@ -70,13 +67,10 @@ class Transformer(nn.Module):
         x = self.token_embedding(x)
 
         # Step 2: Inject positional awareness
-        #   • Sinusoidal / RoPE  → adds/rotates the embeddings
-        #   • ALiBi              → nn.Identity(), so x passes through unchanged
         x = self.positional_encoding(x)
         x = self.dropout(x)
 
         # Step 3: Route through the stack of Transformer blocks
-        #   **kwargs carries the ALiBi bias (or nothing for other schemes)
         for block in self.blocks:
             x = block(x, mask=mask, **kwargs)
 
