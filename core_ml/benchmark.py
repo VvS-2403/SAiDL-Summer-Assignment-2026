@@ -1,5 +1,5 @@
 """
-core_ml/experiments/benchmark.py
+core_ml/benchmark.py
 
 Standalone inference benchmark.  For every (attention, positional) combination
 that has a saved checkpoint it measures:
@@ -12,14 +12,20 @@ All results are logged to a dedicated W&B run and also written to a local
 JSON file for the report table.
 
 Run from repo root:
-    python core_ml/experiments/benchmark.py
+    python core_ml/benchmark.py
 
 Hydra overrides are supported as usual:
-    python core_ml/experiments/benchmark.py attention=gqa positional=rope
+    python core_ml/benchmark.py attention=gqa positional=rope
 """
 
-import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+import sys
+import os
+
+# FIX (BUG 10): benchmark.py lives at core_ml/benchmark.py
+# dirname(__file__) = <repo>/core_ml/
+# We need ONE level up ("..")  to reach the repo root, not TWO ("../..").
+# The old code used "../.." which resolved to the PARENT of the repo.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import json
 import math
@@ -37,7 +43,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 from core_ml.data.dataset import LanguageModelingDataset
-from core_ml.train.train import build_model          # reuse the factory
+from core_ml.train.train import build_model
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -93,7 +99,7 @@ def _eval_perplexity(model: nn.Module, loader: DataLoader, device: torch.device,
 
     elapsed = time.time() - t0
     avg_loss = total_loss / total_tokens
-    ppl = math.exp(min(avg_loss, 20))          # cap at e^20 to avoid overflow
+    ppl = math.exp(min(avg_loss, 20))
     tok_per_sec = total_tokens / elapsed
     return ppl, tok_per_sec
 
@@ -109,7 +115,6 @@ def _latency_benchmark(model: nn.Module, seq_len: int, batch_size: int,
     model.eval()
     dummy = torch.randint(0, 50257, (batch_size, seq_len), device=device)
 
-    # Warmup
     for _ in range(n_warmup):
         _ = model(dummy)
 
@@ -138,8 +143,16 @@ def _latency_benchmark(model: nn.Module, seq_len: int, batch_size: int,
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 
+# config_path is relative to THIS file's location.
+# benchmark.py is at core_ml/benchmark.py, so "../configs" → root/configs — correct.
 @hydra.main(version_base="1.3", config_path="../configs", config_name="config")
 def main(cfg: DictConfig):
+    # Re-anchor CWD and sys.path after Hydra's chdir
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    os.chdir(repo_root)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     run_name = f"bench_{cfg.attention.name}_{cfg.positional.name}"
     print(f"\n{'='*60}")
@@ -162,7 +175,7 @@ def main(cfg: DictConfig):
         os.path.join("outputs", "**", "best_model.pt"), recursive=True
     )
     if ckpt_candidates:
-        ckpt_path = sorted(ckpt_candidates)[-1]   # most recent
+        ckpt_path = sorted(ckpt_candidates)[-1]
         state = torch.load(ckpt_path, map_location=device)
         model.load_state_dict(state)
         print(f"  Loaded checkpoint: {ckpt_path}")
@@ -180,14 +193,13 @@ def main(cfg: DictConfig):
 
     # ── 2. Perplexity + throughput at multiple sequence lengths ───────────────
     eval_seq_lens = [512, 1024]
-    # Only attempt 2048 if the model's max_seq_len supports it
     if cfg.model.max_seq_len >= 2048:
         eval_seq_lens.append(2048)
 
     for seq_len in eval_seq_lens:
         print(f"\n  → seq_len = {seq_len}")
         try:
-            loader = _build_val_loader(seq_len, batch_size=4)   # small batch for memory
+            loader = _build_val_loader(seq_len, batch_size=4)
             _reset_peak_memory()
             ppl, tok_s = _eval_perplexity(model, loader, device)
             mem_mb = _peak_memory_mb()
@@ -206,7 +218,7 @@ def main(cfg: DictConfig):
             print(f"     SKIPPED (seq_len={seq_len}): {e}")
             results[f"ppl_seq{seq_len}"] = None
 
-    # ── 3. Latency micro-benchmark (always at seq_len=1024) ───────────────────
+    # ── 3. Latency micro-benchmark ────────────────────────────────────────────
     print("\n  → Latency micro-benchmark (seq_len=1024, batch=4) ...")
     latency = _latency_benchmark(model, seq_len=1024, batch_size=4, device=device)
     print(f"     {latency}")
@@ -214,8 +226,6 @@ def main(cfg: DictConfig):
     wandb.log({f"bench/{k}": v for k, v in latency.items()})
 
     # ── 4. Positional extrapolation test ─────────────────────────────────────
-    # Train context length is 512; test on 512, 1024, 2048
-    # (Only meaningful if the model was trained at seq_len=512 — log it anyway)
     print("\n  → Positional extrapolation probe ...")
     for test_len in [512, 1024, 2048]:
         if test_len > cfg.model.max_seq_len:
@@ -236,7 +246,6 @@ def main(cfg: DictConfig):
         json.dump(results, f, indent=4)
     print(f"\n  Saved: {out_path}")
 
-    # Log a W&B summary table row
     wandb.log({"benchmark_summary": wandb.Table(
         columns=list(results.keys()),
         data=[list(results.values())],
