@@ -9,12 +9,10 @@ experiment_name: "baseline_transformer"
 seed: 42
 output_dir: "${hydra:runtime.output_dir}"
 
-# Global dataset parameters
 dataset:
-  # FIX: "wikitext" is no longer a valid HF repo ID — must be "Salesforce/wikitext"
   name: "Salesforce/wikitext"
   config_name: "wikitext-2-raw-v1"
   seq_len: 1024
-  batch_size: 32
-  num_workers: 4
+  batch_size: 8
+  num_workers: 2
   pin_memory: true
