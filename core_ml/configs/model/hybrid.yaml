@@ -6,4 +6,8 @@ d_ff: 2048
 dropout: 0.1
 vocab_size: 50257
 max_seq_len: 1024
-hybrid_kernel_size: 3
+
+# Nested structure required - train.py reads cfg.model.hybrid.type and cfg.model.hybrid.conv_kernel_size
+hybrid:
+  type: "conv_before_attn"   # Options: conv_before_attn | gated_conv_ffn | interleaved
+  conv_kernel_size: 3

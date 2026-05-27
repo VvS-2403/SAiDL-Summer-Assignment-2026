@@ -1,4 +1,4 @@
-name: "sparse"
+name: "sparse_attention"
 num_heads: 8
 local_window: 64
 stride: 64

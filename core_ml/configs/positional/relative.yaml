@@ -1,2 +1,2 @@
 name: "relative"
-max_len: 1024
+max_relative_distance: 128
