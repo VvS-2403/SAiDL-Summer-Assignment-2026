@@ -1,5 +1,5 @@
 name: "default_training"
-num_epochs: 35
+num_epochs: 15
 learning_rate: 0.0005
 weight_decay: 0.1
 optimizer: "AdamW"
