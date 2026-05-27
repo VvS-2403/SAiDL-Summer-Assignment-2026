@@ -1,0 +1,3 @@
+name: "rope"
+max_len: 4096
+base: 10000.0

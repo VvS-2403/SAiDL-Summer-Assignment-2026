@@ -1,0 +1,5 @@
+name: "sliding_window"
+num_heads: 8
+window_size: 256
+dropout: 0.1
+is_causal: true

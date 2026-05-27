@@ -1,0 +1,122 @@
+.
+├── Copy_of_SAIDL_training.ipynb
+├── README.md
+├── codebase_structure.txt
+├── core_ml
+│   ├── __init__.py
+│   ├── configs
+│   │   ├── __init__.py
+│   │   ├── attention
+│   │   │   ├── __init__.py
+│   │   │   └── vanilla.yaml
+│   │   ├── config.yaml
+│   │   ├── model
+│   │   │   ├── __init__.py
+│   │   │   └── transformer.yaml
+│   │   ├── positional
+│   │   │   ├── __init__.py
+│   │   │   └── sinusoidal.yaml
+│   │   └── training
+│   │       ├── __init__.py
+│   │       └── default.yaml
+│   ├── data
+│   │   ├── __init__.py
+│   │   └── dataset.py
+│   ├── experiments
+│   │   └── __init__.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   ├── attention
+│   │   │   ├── Sparse_attention.py
+│   │   │   ├── __init__.py
+│   │   │   ├── gqa.py
+│   │   │   ├── performer.py
+│   │   │   ├── relu_attention.py
+│   │   │   ├── sliding_window.py
+│   │   │   └── vanilla_attention.py
+│   │   ├── blocks.py
+│   │   ├── ffn.py
+│   │   ├── positional
+│   │   │   ├── Alibi.py
+│   │   │   ├── Rope.py
+│   │   │   ├── Sinusoidal.py
+│   │   │   └── __init__.py
+│   │   └── transformer.py
+│   ├── train
+│   │   ├── __init__.py
+│   │   ├── dataset.py
+│   │   ├── train.py
+│   │   └── trainer.py
+│   └── utils
+│       ├── __init__.py
+│       ├── helpers.py
+│       ├── logger.py
+│       └── metrics.py
+├── mechanistic_interpretability
+│   ├── __init__.py
+│   ├── analysis
+│   │   ├── __init__.py
+│   │   ├── clustering.py
+│   │   ├── evaluate.py
+│   │   ├── neuron_analysis.py
+│   │   ├── spectral.py
+│   │   └── visualization.py
+│   ├── checkpoints
+│   │   └── __init__.py
+│   ├── configs
+│   │   ├── __init__.py
+│   │   ├── config.yaml
+│   │   ├── data
+│   │   │   ├── __init__.py
+│   │   │   └── openwebtext.yaml
+│   │   ├── model
+│   │   │   ├── __init__.py
+│   │   │   └── distilgpt2.yaml
+│   │   ├── quantization
+│   │   │   ├── __init__.py
+│   │   │   └── base.yaml
+│   │   ├── sae
+│   │   │   ├── __init__.py
+│   │   │   └── base.yaml
+│   │   └── training
+│   │       ├── __init__.py
+│   │       └── default.yaml
+│   ├── data
+│   │   ├── __init__.py
+│   │   ├── cache
+│   │   │   └── __init__.py
+│   │   └── samples
+│   │       └── __init__.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   ├── hooks.py
+│   │   ├── quantizer.py
+│   │   └── sae.py
+│   ├── notebooks
+│   │   ├── 01_extract.ipynb
+│   │   ├── 02_train_sae.ipynb
+│   │   ├── 03_quantization.ipynb
+│   │   ├── 04_analysis.ipynb
+│   │   └── __init__.py
+│   ├── outputs
+│   │   └── __init__.py
+│   ├── pipeline
+│   │   ├── __init__.py
+│   │   ├── extract_activations.py
+│   │   ├── quantize.py
+│   │   └── train_sae.py
+│   ├── train
+│   │   ├── __init__.py
+│   │   ├── sae_trainer.py
+│   │   └── utils.py
+│   └── utils
+│       ├── __init__.py
+│       ├── dataset.py
+│       ├── helpers.py
+│       ├── logger.py
+│       └── metrics.py
+├── requirements.txt
+├── shared
+└── structure.txt
+
+32 directories, 87 files

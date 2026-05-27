@@ -1,0 +1,5 @@
+name: "gqa"
+num_heads: 8
+num_kv_heads: 2
+dropout: 0.1
+is_causal: true

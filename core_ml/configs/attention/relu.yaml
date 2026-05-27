@@ -1,0 +1,4 @@
+name: "relu"
+num_heads: 8
+dropout: 0.1
+is_causal: true

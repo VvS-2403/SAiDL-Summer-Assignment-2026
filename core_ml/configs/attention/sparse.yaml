@@ -1,0 +1,6 @@
+name: "sparse"
+num_heads: 8
+local_window: 64
+stride: 64
+dropout: 0.1
+is_causal: true

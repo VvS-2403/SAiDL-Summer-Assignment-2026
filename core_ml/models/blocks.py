@@ -1,3 +1,14 @@
+"""
+core_ml/models/blocks.py
+
+Single standard Transformer block (Pre-LN) with dependency injection for:
+  • ALiBi / Relative positional bias  (via `alibi` constructor arg)
+  • RoPE                               (via `rope`  constructor arg)
+
+Both are forwarded into the attention module through its forward() kwargs,
+keeping the Transformer shell and block API completely clean.
+"""
+
 import torch
 import torch.nn as nn
 from typing import Optional
@@ -5,15 +16,22 @@ from typing import Optional
 
 class TransformerBlock(nn.Module):
     """
-    A single standard Transformer block utilizing Pre-Layer Normalization.
-    Designed for dependency injection to easily swap Attention and FFN variants.
+    Pre-LayerNorm Transformer block.
 
-    ALiBi support
-    -------------
-    If an `alibi` module is supplied at construction time, the block computes
-    the ALiBi bias matrix on every forward pass and adds it to the attention
-    scores via the **kwargs pathway.  All other positional schemes (Sinusoidal,
-    RoPE) leave `alibi=None` and the pathway is completely skipped.
+    Positional scheme injection
+    ---------------------------
+    alibi (nn.Module | None):
+        An ALiBiPositionalBias or RelativePositionalBias instance.
+        The block calls alibi(seq_len, seq_len, device) on every forward pass
+        and injects the result as `alibi_bias` into the attention kwargs.
+
+    rope (nn.Module | None):
+        A RotaryPositionalEmbedding instance.
+        Passed directly as `rope=...` into the attention forward() so the
+        attention module can rotate Q and K after head-splitting (the only
+        mathematically correct place to apply RoPE).
+
+    For vanilla Sinusoidal runs, both are None and there is zero overhead.
     """
 
     def __init__(
@@ -23,29 +41,29 @@ class TransformerBlock(nn.Module):
         ffn_module: nn.Module,
         dropout: float = 0.1,
         alibi: Optional[nn.Module] = None,
+        rope:  Optional[nn.Module] = None,
     ):
         """
         Args:
-            d_model (int): The embedding dimension.
-            attention_module (nn.Module): The instantiated attention class.
-            ffn_module (nn.Module): The instantiated Feed-Forward class.
-            dropout (float): Dropout probability.
-            alibi (nn.Module | None): A shared ALiBiPositionalBias instance,
-                                      or None for non-ALiBi runs.
+            d_model           : Embedding dimension.
+            attention_module  : Instantiated attention class.
+            ffn_module        : Instantiated Feed-Forward class.
+            dropout           : Dropout probability.
+            alibi             : ALiBi or RelativeBias module, or None.
+            rope              : RotaryPositionalEmbedding module, or None.
         """
         super().__init__()
 
-        # LayerNorms applied BEFORE the sub-layers (Pre-LN architecture)
-        self.ln_1 = nn.LayerNorm(d_model)
-        self.attn = attention_module
+        self.ln_1   = nn.LayerNorm(d_model)
+        self.attn   = attention_module
 
-        self.ln_2 = nn.LayerNorm(d_model)
-        self.ffn = ffn_module
+        self.ln_2   = nn.LayerNorm(d_model)
+        self.ffn    = ffn_module
 
         self.dropout = nn.Dropout(dropout)
 
-        # Store the ALiBi module (None if not used)
-        self.alibi = alibi
+        self.alibi = alibi   # None for Sinusoidal / RoPE runs
+        self.rope  = rope    # None for Sinusoidal / ALiBi / Relative runs
 
     def forward(
         self,
@@ -55,33 +73,29 @@ class TransformerBlock(nn.Module):
     ) -> torch.Tensor:
         """
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, seq_len, d_model).
-            mask (torch.Tensor, optional): Causal / padding mask.
-            **kwargs: Caught and forwarded; kept for API compatibility.
+            x    : (batch_size, seq_len, d_model)
+            mask : optional causal / padding mask
         Returns:
-            torch.Tensor: Output tensor of shape (batch_size, seq_len, d_model).
+            (batch_size, seq_len, d_model)
         """
         seq_len = x.size(1)
 
-        # ── ALiBi bias ────────────────────────────────────────────────────────
-        # Compute the bias matrix on-the-fly and inject it into the attention
-        # call.  For all other positional schemes alibi is None and this block
-        # is skipped entirely, adding zero overhead.
+        # ── Positional bias (ALiBi or learned Relative Bias) ──────────────
+        # Computed on-the-fly and injected into attention via alibi_bias kwarg.
+        # Skipped entirely for Sinusoidal and RoPE runs (alibi is None).
         if self.alibi is not None:
-            alibi_bias = self.alibi(seq_len, seq_len, x.device)
-            kwargs["alibi_bias"] = alibi_bias
-        # ─────────────────────────────────────────────────────────────────────
+            kwargs["alibi_bias"] = self.alibi(seq_len, seq_len, x.device)
 
-        # Block 1: Multi-Head Attention Sub-layer
-        # Path: Normalize → Attend → Dropout → Residual Add
-        normalized_x = self.ln_1(x)
-        attn_out = self.attn(normalized_x, mask=mask, **kwargs)
-        x = x + self.dropout(attn_out)
+        # ── RoPE ──────────────────────────────────────────────────────────
+        # Pass the module itself into attention so it can rotate Q and K
+        # after head-splitting (the module is stateless at inference time).
+        if self.rope is not None:
+            kwargs["rope"] = self.rope
 
-        # Block 2: Feed-Forward Network Sub-layer
-        # Path: Normalize → FFN → Dropout → Residual Add
-        normalized_x2 = self.ln_2(x)
-        ffn_out = self.ffn(normalized_x2)
-        x = x + self.dropout(ffn_out)
+        # ── Attention sub-layer (Pre-LN) ──────────────────────────────────
+        x = x + self.dropout(self.attn(self.ln_1(x), mask=mask, **kwargs))
+
+        # ── FFN sub-layer (Pre-LN) ────────────────────────────────────────
+        x = x + self.dropout(self.ffn(self.ln_2(x)))
 
         return x
