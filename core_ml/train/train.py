@@ -177,12 +177,12 @@ def build_model(cfg: DictConfig) -> nn.Module:
         )
 
     elif pos_name == "rope":
-        block_rope = RotaryPositionalEmbedding(
-            d_model,
-            max_seq_len=cfg.model.max_seq_len,
-            base=cfg.positional.get("base", 10000.0),
-        )
-
+          d_head = d_model // n_heads
+          block_rope = RotaryPositionalEmbedding(
+              d_head,
+              max_seq_len=cfg.model.max_seq_len,
+              base=cfg.positional.get("base", 10000.0),
+          )
     elif pos_name == "alibi":
         block_alibi = ALiBiPositionalBias(n_heads)
 
