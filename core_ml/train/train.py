@@ -33,7 +33,7 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import LambdaLR
 import wandb
 
 # ── Internal imports ──────────────────────────────────────────────────────────
@@ -309,12 +309,19 @@ def main(cfg: DictConfig):
         weight_decay=cfg.training.weight_decay,
         betas=tuple(cfg.training.betas),
     )
-    total_steps = cfg.training.num_epochs * len(train_loader)
-    scheduler = CosineAnnealingLR(
-        optimizer,
-        T_max=total_steps,
-        eta_min=cfg.training.min_lr,
-    )
+    total_steps = cfg.training.num_epochs * max(1, len(train_loader) // cfg.training.gradient_accumulation_steps)
+    warmup_steps = cfg.training.warmup_iters
+    base_lr = cfg.training.learning_rate
+    min_lr = cfg.training.min_lr
+
+    def lr_lambda(step: int) -> float:
+        if step < warmup_steps:
+            return (step + 1) / max(1, warmup_steps)
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        cosine = 0.5 * (1.0 + torch.cos(torch.pi * progress))
+        return max(min_lr / base_lr, cosine)
+
+    scheduler = LambdaLR(optimizer, lr_lambda)
 
     # ── Train ─────────────────────────────────────────────────────────────────
     trainer = Trainer(model, train_loader, val_loader, optimizer, scheduler, cfg, device)
