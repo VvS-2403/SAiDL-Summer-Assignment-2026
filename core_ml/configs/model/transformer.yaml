@@ -1,8 +1,8 @@
 name: "baseline_transformer"
-d_model: 512
+d_model: 128
 n_layers: 6
 n_heads: 8
-d_ff: 2048
+d_ff: 512
 dropout: 0.1
 vocab_size: 50257
 max_seq_len: 1024
