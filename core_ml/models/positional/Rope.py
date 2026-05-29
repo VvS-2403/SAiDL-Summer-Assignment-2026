@@ -66,8 +66,8 @@ class RotaryPositionalEmbedding(nn.Module):
             self._set_cos_sin_cache(seq_len=seq_len)
 
         # Slice the cached positional matrices up to the current sequence length
-        cos = self.cos_cached[:, :, :seq_len, ...]
-        sin = self.sin_cached[:, :, :seq_len, ...]
+        cos = self.cos_cached[:, :, :seq_len, ...].to(dtype=q.dtype, device=q.device)
+        sin = self.sin_cached[:, :, :seq_len, ...].to(dtype=q.dtype, device=q.device)
 
         # Apply the rotary transformation
         q_rotated = (q * cos) + (rotate_half(q) * sin)

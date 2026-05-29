@@ -48,7 +48,8 @@ from core_ml.models.attention.vanilla_attention import MultiHeadAttention
 from core_ml.models.attention.sliding_window    import SlidingWindowAttention
 from core_ml.models.attention.gqa               import GroupedQueryAttention
 from core_ml.models.attention.relu_attention    import ReLUAttention
-from core_ml.models.attention.Sparse_attention  import SparseAttention
+from core_ml.models.attention.sparse_attention  import SparseAttention
+from core_ml.models.attention.performer         import PerformerAttention
 
 # Positional variants
 from core_ml.models.positional.Sinusoidal   import SinusoidalPositionalEncoding
@@ -115,10 +116,19 @@ def _build_attention(cfg: DictConfig) -> nn.Module:
             is_causal=is_causal,
         )
 
+    elif name == "performer":
+        return PerformerAttention(
+            d_model,
+            num_heads=n_heads,
+            num_random_features=cfg.attention.get("num_random_features", 256),
+            dropout=dropout,
+            is_causal=is_causal,
+        )
+
     else:
         raise ValueError(
             f"Unknown attention type: '{name}'. "
-            "Valid: vanilla_mha, sliding_window, gqa, relu_attention, sparse_attention"
+            "Valid: vanilla_mha, sliding_window, gqa, relu_attention, sparse_attention, performer"
         )
 
 
@@ -271,13 +281,23 @@ def main(cfg: DictConfig):
         model = torch.compile(model)
 
     # ── Optimiser + scheduler ─────────────────────────────────────────────────
-    optimizer = optim.AdamW(
-        model.parameters(),
-        lr=cfg.training.learning_rate,
-        weight_decay=cfg.training.weight_decay,
-        betas=tuple(cfg.training.betas),
-        fused=(device.type == "cuda"),  # High-throughput unified memory access kernel
-    )
+    # Create AdamW optimizer. Some PyTorch builds (Colab) don't accept the
+    # `fused` kwarg — fall back gracefully if it's unsupported.
+    try:
+        optimizer = optim.AdamW(
+            model.parameters(),
+            lr=cfg.training.learning_rate,
+            weight_decay=cfg.training.weight_decay,
+            betas=tuple(cfg.training.betas),
+            fused=(device.type == "cuda"),
+        )
+    except TypeError:
+        optimizer = optim.AdamW(
+            model.parameters(),
+            lr=cfg.training.learning_rate,
+            weight_decay=cfg.training.weight_decay,
+            betas=tuple(cfg.training.betas),
+        )
     total_steps = cfg.training.num_epochs * max(
         1, len(train_loader) // cfg.training.gradient_accumulation_steps
     )

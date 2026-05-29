@@ -1,4 +1,4 @@
 name: "relu_attention"
-num_heads: 8
+num_heads: 4
 dropout: 0.1
 is_causal: true

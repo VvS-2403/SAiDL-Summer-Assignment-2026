@@ -53,7 +53,8 @@ class Trainer:
 
         # ── AMP: use the non-deprecated torch.amp API ─────────────────────────
         self.use_fp16 = (config.training.mixed_precision == "fp16")
-        self.scaler   = torch.amp.GradScaler("cuda", enabled=self.use_fp16)
+        # GradScaler does not take a device string; only enable/disable via `enabled`
+        self.scaler = torch.amp.GradScaler(enabled=self.use_fp16)
 
         self.global_step   = 0
         self.best_val_loss = float("inf")
@@ -168,8 +169,17 @@ class Trainer:
         eval_every = cfg.training.eval_interval
         accum_steps = cfg.training.gradient_accumulation_steps
 
+        # Early stop after a fixed number of global steps (default: 2000)
+        early_stop_steps = 2000
+        if hasattr(cfg.training, "early_stop_steps"):
+            try:
+                early_stop_steps = int(cfg.training.early_stop_steps)
+            except Exception:
+                pass
+
         self.model.train()
 
+        stop_training = False
         for epoch in range(cfg.training.num_epochs):
             epoch_loss   = 0.0
             epoch_tokens = 0
@@ -212,6 +222,12 @@ class Trainer:
                     self.optimizer.zero_grad(set_to_none=True)
                     self.scheduler.step()
                     self.global_step += 1
+
+                    # Check early stopping condition by global steps
+                    if self.global_step >= early_stop_steps:
+                        print(f"Early stopping at step {self.global_step} (>= {early_stop_steps})")
+                        stop_training = True
+                        break
 
                     # ── Throughput ────────────────────────────────────────────
                     step_secs = time.perf_counter() - step_start
@@ -289,6 +305,9 @@ class Trainer:
                 f"tok/s={epoch_tps:.0f} | peak_gpu={peak_epoch_mb:.0f} MB | "
                 f"time={epoch_secs:.1f}s"
             )
+
+            if stop_training:
+                break
 
         # ── Final evaluation after all epochs ─────────────────────────────────
         print("\nRunning final evaluation...")

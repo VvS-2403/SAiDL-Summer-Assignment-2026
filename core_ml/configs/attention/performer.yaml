@@ -1,0 +1,5 @@
+name: "performer"
+num_heads: 4
+num_random_features: 256
+dropout: 0.1
+is_causal: false

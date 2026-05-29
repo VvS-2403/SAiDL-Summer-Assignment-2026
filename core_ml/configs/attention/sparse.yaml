@@ -1,5 +1,5 @@
 name: "sparse_attention"
-num_heads: 8
+num_heads: 4
 local_window: 64
 stride: 64
 dropout: 0.1

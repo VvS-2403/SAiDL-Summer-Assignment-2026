@@ -1,0 +1,19 @@
+core_ml/configs - Configuration summary
+
+config.yaml: Root Hydra config that composes defaults and global dataset/experiment settings (seq_len=1024, batch_size, dataset name).
+
+training/default.yaml: Default training hyperparameters (epochs, lr, optimizer, warmup, mixed precision, logging).
+
+positional/sinusoidal.yaml: Sinusoidal positional encoding settings (max_len, base) for classical PE injection.
+positional/rope.yaml: Rotary positional embedding settings (d_model split per-head use, max_len) for RoPE.
+positional/relative.yaml: Relative positional bias settings (max_relative_distance) for T5-style biases.
+positional/alibi.yaml: ALiBi positional bias selector (no params in file) for linear attention biasing.
+
+attention/vanilla.yaml: Standard multi-head attention configuration (num heads, dropout, causal flag).
+attention/sliding_window.yaml: Sliding-window local attention config (window size, dropout, causal flag).
+attention/gqa.yaml: Grouped-Query Attention config (num_kv_heads, dropout, causal flag) for GQA variants.
+attention/relu.yaml: ReLU-based attention config (dropout, causal) used by ReLUAttention implementation.
+attention/sparse.yaml: Sparse attention config (local_window, stride, dropout, causal) for block-sparse variants.
+
+model/transformer.yaml: Baseline transformer model settings (d_model, n_layers, n_heads, d_ff, dropout, vocab_size, max_seq_len).
+model/hybrid.yaml: Hybrid transformer variant settings (larger d_model/d_ff and `hybrid` block options like conv_before_attn, gated_conv_ffn, interleaved).

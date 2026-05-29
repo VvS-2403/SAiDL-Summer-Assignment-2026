@@ -1,0 +1,13 @@
+mechanistic_interpretability/configs - Configuration summary
+
+config.yaml: Root Hydra config for the mechanistic pipeline (composes data/model/quantization/sae/training defaults and global pipeline params like target_layer, d_model, max_seq_len).
+
+training/default.yaml: SAE training hyperparameters (learning rate, num_epochs, logging/save intervals tailored for SAE training).
+
+model/distilgpt2.yaml: Model settings for using a pretrained `distilgpt2` (cache dir, dtype, hidden-state output toggles).
+
+quantization/base.yaml: Quantization parameters (method, bits, per-channel, calibration strategy) for model quantization experiments.
+
+data/openwebtext.yaml: Data source settings for OpenWebText streaming and caching (split, max_samples, tokenizer, cache locations).
+
+sae/base.yaml: Sparse Autoencoder architecture and sparsity hyperparameters (expansion factor, k active neurons, normalization).
