@@ -17,15 +17,15 @@ Supported model types (cfg.model.name):
 Hybrid sub-types (cfg.model.hybrid.type):
     conv_before_attn | gated_conv_ffn | interleaved
 
-Fixes vs previous version:
-    - n_layers now correctly passed to ReLUAttention and SparseAttention
-      (they had default n_layers=6, causing wrong scaled init for other configs)
-    - Hybrid rope injection cleaned up: passed at construction time, not re-set after
-    - Hybrid model now correctly reads cfg.model.hybrid.type and cfg.model.hybrid.conv_kernel_size
+Fix: torch.cos(torch.pi * progress) → math.cos(math.pi * progress)
+     torch.pi is a float, but torch.cos expects a tensor; this caused a
+     TypeError at runtime. math.cos(math.pi * float) is the correct call.
 """
 
 import sys
 import os
+import math  # ← used for lr_lambda cosine schedule (not torch.cos/torch.pi)
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 import hydra
@@ -69,15 +69,9 @@ from core_ml.models.hybrid.hybrid_blocks import (
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _build_attention(cfg: DictConfig) -> nn.Module:
-    """Instantiates the correct attention module from config.
-
-    FIX: n_layers is now explicitly passed to every attention variant so that
-    the GPT-2 scaled output-projection initialisation uses the actual model
-    depth, not a hard-coded default of 6.
-    """
     d_model   = cfg.model.d_model
     n_heads   = cfg.model.n_heads
-    n_layers  = cfg.model.n_layers   # used for scaled init in every variant
+    n_layers  = cfg.model.n_layers
     dropout   = cfg.attention.dropout
     is_causal = cfg.attention.is_causal
     name      = cfg.attention.name
@@ -104,7 +98,6 @@ def _build_attention(cfg: DictConfig) -> nn.Module:
         )
 
     elif name == "relu_attention":
-        # FIX: n_layers was missing here before; defaulted silently to 6
         return ReLUAttention(
             d_model, n_heads,
             n_layers=n_layers,
@@ -113,7 +106,6 @@ def _build_attention(cfg: DictConfig) -> nn.Module:
         )
 
     elif name == "sparse_attention":
-        # FIX: n_layers was missing here before; defaulted silently to 6
         return SparseAttention(
             d_model, n_heads,
             n_layers=n_layers,
@@ -135,28 +127,6 @@ def _build_attention(cfg: DictConfig) -> nn.Module:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_model(cfg: DictConfig) -> nn.Module:
-    """
-    Builds the full Transformer from the Hydra config.
-
-    Positional encoding dispatch
-    ----------------------------
-    sinusoidal : added to token embeddings inside the Transformer shell (classic).
-    rope       : RoPE module passed into every block; each block forwards it into
-                 attention.forward() via kwargs so Q and K are rotated AFTER
-                 head-splitting. nn.Identity() is passed as the shell's
-                 positional_encoding so the shell does nothing extra.
-    alibi      : ALiBiPositionalBias injected into every block; computed on-the-fly
-                 and added to attention scores. nn.Identity() for the shell.
-    relative   : RelativePositionalBias injected the same way as ALiBi.
-                 nn.Identity() for the shell.
-
-    Hybrid dispatch
-    ---------------
-    Reads cfg.model.hybrid.type (conv_before_attn | gated_conv_ffn | interleaved).
-    Reads cfg.model.hybrid.conv_kernel_size for the depthwise conv kernel.
-    FIX: hybrid.yaml now has a nested 'hybrid:' block; previously hybrid_kernel_size
-    was a flat key that train.py could never find.
-    """
     d_model  = cfg.model.d_model
     n_heads  = cfg.model.n_heads
     n_layers = cfg.model.n_layers
@@ -177,12 +147,13 @@ def build_model(cfg: DictConfig) -> nn.Module:
         )
 
     elif pos_name == "rope":
-          d_head = d_model // n_heads
-          block_rope = RotaryPositionalEmbedding(
-              d_head,
-              max_seq_len=cfg.model.max_seq_len,
-              base=cfg.positional.get("base", 10000.0),
-          )
+        d_head = d_model // n_heads
+        block_rope = RotaryPositionalEmbedding(
+            d_head,
+            max_seq_len=cfg.model.max_seq_len,
+            base=cfg.positional.get("base", 10000.0),
+        )
+
     elif pos_name == "alibi":
         block_alibi = ALiBiPositionalBias(n_heads)
 
@@ -198,9 +169,8 @@ def build_model(cfg: DictConfig) -> nn.Module:
             "Valid: sinusoidal, rope, alibi, relative"
         )
 
-    # ── 2. Determine if hybrid and read hybrid config ─────────────────────────
+    # ── 2. Hybrid config ──────────────────────────────────────────────────────
     is_hybrid   = (cfg.model.name == "hybrid_transformer")
-    # FIX: reads the nested cfg.model.hybrid sub-dict, not a flat key
     hybrid_cfg  = cfg.model.get("hybrid", {})
     hybrid_type = hybrid_cfg.get("type", "conv_before_attn") if is_hybrid else None
     kernel_size = hybrid_cfg.get("conv_kernel_size", 3)      if is_hybrid else 3
@@ -212,7 +182,6 @@ def build_model(cfg: DictConfig) -> nn.Module:
         ffn  = FeedForward(d_model, d_ff, n_layers, dropout)
 
         if not is_hybrid:
-            # ── Standard Pre-LN TransformerBlock ─────────────────────────────
             block = TransformerBlock(
                 d_model, attn, ffn, dropout,
                 alibi=block_alibi,
@@ -220,8 +189,6 @@ def build_model(cfg: DictConfig) -> nn.Module:
             )
 
         elif hybrid_type == "conv_before_attn":
-            # ── Conv1D prepended before every attention sub-layer ─────────────
-            # FIX: rope passed at construction, not re-set via block.rope after
             block = ConvBeforeAttnBlock(
                 d_model, attn, ffn, dropout,
                 kernel_size=kernel_size,
@@ -230,8 +197,6 @@ def build_model(cfg: DictConfig) -> nn.Module:
             )
 
         elif hybrid_type == "gated_conv_ffn":
-            # ── Standard attention + gated conv FFN ──────────────────────────
-            # FIX: rope passed at construction, not re-set via block.rope after
             block = GatedConvFFNBlock(
                 d_model, attn, d_ff, dropout,
                 kernel_size=kernel_size,
@@ -240,7 +205,6 @@ def build_model(cfg: DictConfig) -> nn.Module:
             )
 
         elif hybrid_type == "interleaved":
-            # ── Even layers = pure conv block, odd layers = attention block ───
             if layer_idx % 2 == 0:
                 block = PureConvBlock(d_model, d_ff, kernel_size, dropout)
             else:
@@ -275,7 +239,6 @@ def build_model(cfg: DictConfig) -> nn.Module:
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="config")
 def main(cfg: DictConfig):
-    # Hydra changes CWD; re-anchor sys.path so all imports stay valid
     os.chdir(os.path.dirname(os.path.abspath(__file__)) + "/../..")
     sys.path.insert(0, os.getcwd())
 
@@ -309,16 +272,21 @@ def main(cfg: DictConfig):
         weight_decay=cfg.training.weight_decay,
         betas=tuple(cfg.training.betas),
     )
-    total_steps = cfg.training.num_epochs * max(1, len(train_loader) // cfg.training.gradient_accumulation_steps)
+    total_steps = cfg.training.num_epochs * max(
+        1, len(train_loader) // cfg.training.gradient_accumulation_steps
+    )
     warmup_steps = cfg.training.warmup_iters
     base_lr = cfg.training.learning_rate
-    min_lr = cfg.training.min_lr
+    min_lr  = cfg.training.min_lr
 
+    # FIX: use math.cos / math.pi — torch.cos requires a Tensor, not a float.
+    # torch.pi is just a float constant so torch.cos(torch.pi * float) raises
+    # "RuntimeError: expected Tensor". math.cos takes a plain Python float.
     def lr_lambda(step: int) -> float:
         if step < warmup_steps:
             return (step + 1) / max(1, warmup_steps)
         progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
-        cosine = 0.5 * (1.0 + torch.cos(torch.pi * progress))
+        cosine = 0.5 * (1.0 + math.cos(math.pi * progress))   # ← FIXED
         return max(min_lr / base_lr, cosine)
 
     scheduler = LambdaLR(optimizer, lr_lambda)
