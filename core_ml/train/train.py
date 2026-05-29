@@ -265,12 +265,18 @@ def main(cfg: DictConfig):
     wandb.config.update({"n_params_M": round(n_params, 2)})
     wandb.watch(model, log="gradients", log_freq=200)
 
+    # ── Throughput Optimizations ──────────────────────────────────────────────
+    if device.type == "cuda" and hasattr(torch, "compile"):
+        print("Optimizing execution graphs via torch.compile()...")
+        model = torch.compile(model)
+
     # ── Optimiser + scheduler ─────────────────────────────────────────────────
     optimizer = optim.AdamW(
         model.parameters(),
         lr=cfg.training.learning_rate,
         weight_decay=cfg.training.weight_decay,
         betas=tuple(cfg.training.betas),
+        fused=(device.type == "cuda"),  # High-throughput unified memory access kernel
     )
     total_steps = cfg.training.num_epochs * max(
         1, len(train_loader) // cfg.training.gradient_accumulation_steps
