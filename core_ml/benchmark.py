@@ -159,12 +159,15 @@ def main(cfg: DictConfig):
     print(f"  BENCHMARK: {run_name}")
     print(f"{'='*60}")
 
-    wandb.init(
-        project="SAiDL-Core-ML",
-        name=run_name,
-        config=OmegaConf.to_container(cfg, resolve=True),
-        tags=["benchmark", cfg.attention.name, cfg.positional.name],
-    )
+    wandb_kwargs = {
+        'project': os.getenv('WANDB_PROJECT', 'SAiDL-CORE ML'),
+        'name': run_name,
+        'config': OmegaConf.to_container(cfg, resolve=True),
+        'tags': ['benchmark', cfg.attention.name, cfg.positional.name],
+    }
+    if os.getenv('WANDB_ENTITY'):
+        wandb_kwargs['entity'] = os.getenv('WANDB_ENTITY')
+    wandb.init(**wandb_kwargs)
 
     # ── 1. Build model ────────────────────────────────────────────────────────
     model = build_model(cfg).to(device)

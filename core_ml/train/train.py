@@ -258,12 +258,15 @@ def main(cfg: DictConfig):
 
     # ── W&B ──────────────────────────────────────────────────────────────────
     run_name = f"{cfg.experiment_name}_{cfg.attention.name}_{cfg.positional.name}"
-    wandb.init(
-        project="SAiDL-Core-ML",
-        name=run_name,
-        config=OmegaConf.to_container(cfg, resolve=True),
-        tags=[cfg.attention.name, cfg.positional.name, cfg.model.name, "training"],
-    )
+    wandb_kwargs = {
+        'project': os.getenv('WANDB_PROJECT', 'SAiDL-CORE ML'),
+        'name': run_name,
+        'config': OmegaConf.to_container(cfg, resolve=True),
+        'tags': [cfg.attention.name, cfg.positional.name, cfg.model.name, 'training'],
+    }
+    if os.getenv('WANDB_ENTITY'):
+        wandb_kwargs['entity'] = os.getenv('WANDB_ENTITY')
+    wandb.init(**wandb_kwargs)
 
     # ── Data ──────────────────────────────────────────────────────────────────
     train_loader, val_loader = prepare_dataloaders(cfg)
