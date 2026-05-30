@@ -5,4 +5,4 @@ n_heads: 4
 d_ff: 1024
 dropout: 0.05
 vocab_size: 50264
-max_seq_len: 1024
+max_seq_len: 4096

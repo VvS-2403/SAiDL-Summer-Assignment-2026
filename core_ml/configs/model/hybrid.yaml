@@ -5,7 +5,7 @@ n_heads: 4
 d_ff: 1024
 dropout: 0.1
 vocab_size: 50257
-max_seq_len: 1024
+max_seq_len: 4096
 
 hybrid:
   type: "conv_before_attn"   # Options: conv_before_attn | gated_conv_ffn | interleaved
