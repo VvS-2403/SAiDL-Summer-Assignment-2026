@@ -33,27 +33,39 @@ def variance_explained(original: torch.Tensor, reconstructed: torch.Tensor) -> f
     return float(1.0 - mse / var)
 
 
-def compute_cka(X: np.ndarray, Y: np.ndarray) -> float:
+def linear_cka(X: np.ndarray, Y: np.ndarray) -> float:
     X = X - X.mean(axis=0, keepdims=True)
     Y = Y - Y.mean(axis=0, keepdims=True)
-    K = X @ X.T
-    L = Y @ Y.T
-    hsic = _hsic(K, L)
-    denom = np.sqrt(_hsic(K, K) * _hsic(L, L))
-    return float(hsic / denom) if denom > 0 else 0.0
+    Kx = X @ X.T
+    Ky = Y @ Y.T
+
+    def centre(K: np.ndarray) -> np.ndarray:
+        n = K.shape[0]
+        H = np.eye(n) - np.ones((n, n)) / n
+        return H @ K @ H
+
+    Kx_c = centre(Kx)
+    Ky_c = centre(Ky)
+
+    hsic_xy = np.sum(Kx_c * Ky_c)
+    hsic_xx = np.sqrt(np.sum(Kx_c * Kx_c))
+    hsic_yy = np.sqrt(np.sum(Ky_c * Ky_c))
+    return float(hsic_xy / (hsic_xx * hsic_yy + 1e-8))
 
 
-def _hsic(K: np.ndarray, L: np.ndarray) -> float:
-    n = K.shape[0]
-    H = np.eye(n) - np.ones((n, n)) / n
-    return float(np.trace(K @ H @ L @ H)) / ((n - 1) ** 2)
-
-
-def compute_sds(clean: np.ndarray, quant: np.ndarray) -> float:
-    n = min(len(clean), len(quant))
-    clean = clean[:n]
-    quant = quant[:n]
-    norm = np.linalg.norm(clean)
-    if norm < 1e-10:
+def compute_sds(clean: np.ndarray, quant: np.ndarray, k: int = 32) -> float:
+    """Subspace Distance Score (SDS) between clean and quantized activations."""
+    n = min(clean.shape[0], quant.shape[0])
+    if n == 0:
         return 0.0
-    return float(np.linalg.norm(clean - quant) / norm)
+    H_c = clean[:n] - clean[:n].mean(axis=0, keepdims=True)
+    H_q = quant[:n] - quant[:n].mean(axis=0, keepdims=True)
+    _, _, Vc = np.linalg.svd(H_c, full_matrices=False)
+    _, _, Vq = np.linalg.svd(H_q, full_matrices=False)
+    k = min(k, Vc.shape[0], Vq.shape[0])
+    Vc_k = Vc[:k].T
+    Vq_k = Vq[:k].T
+    M = Vc_k.T @ Vq_k
+    sv = np.linalg.svd(M, compute_uv=False)
+    cos_angles = np.clip(sv, -1.0, 1.0)
+    return float(1.0 - cos_angles.mean())

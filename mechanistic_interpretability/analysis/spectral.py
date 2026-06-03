@@ -50,8 +50,10 @@ def analyze_spectral_properties(cfg: DictConfig):
     device = torch.device(cfg.pipeline.device if torch.cuda.is_available() else "cpu")
     print(f"Starting Spectral (SVD) Analysis Pipeline on {device}...")
 
+    checkpoint_root = getattr(cfg, 'checkpoints', None)
+    checkpoint_root = checkpoint_root.dir if checkpoint_root and hasattr(checkpoint_root, 'dir') else cfg.output_dir
     # 1. Load the Trained SAE
-    sae_path = os.path.join(cfg.checkpoints.dir if hasattr(cfg, 'checkpoints') else cfg.output_dir, "sae_final_weights.pt")
+    sae_path = os.path.join(checkpoint_root, "sae_final.pt")
     if not os.path.exists(sae_path):
         raise FileNotFoundError(f"Trained SAE not found at {sae_path}. Run train_sae.py first.")
 
@@ -99,15 +101,17 @@ def analyze_spectral_properties(cfg: DictConfig):
         print(f"{k}: {v}")
 
     # 5. Save Outputs
-    os.makedirs(cfg.outputs.dir if hasattr(cfg, 'outputs') else cfg.output_dir, exist_ok=True)
+    output_root = getattr(cfg, 'outputs', None)
+    output_root = output_root.dir if output_root and hasattr(output_root, 'dir') else cfg.output_dir
+    os.makedirs(output_root, exist_ok=True)
     
     # Save Metrics JSON
-    metrics_path = os.path.join(cfg.outputs.dir if hasattr(cfg, 'outputs') else cfg.output_dir, f"spectral_metrics_{cfg.quantization.bits}bit.json")
+    metrics_path = os.path.join(output_root, f"spectral_metrics_{cfg.quantization.bits}bit.json")
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=4)
         
     # Generate and Save Scree Plot
-    plot_path = os.path.join(cfg.outputs.dir if hasattr(cfg, 'outputs') else cfg.output_dir, f"spectral_scree_{cfg.quantization.bits}bit.png")
+    plot_path = os.path.join(output_root, f"spectral_scree_{cfg.quantization.bits}bit.png")
     plot_scree(singular_values, plot_path, cfg.quantization.bits)
 
 if __name__ == "__main__":

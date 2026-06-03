@@ -25,6 +25,7 @@ def train_sae(cfg: DictConfig):
     # 2. Instantiate the Sparse Autoencoder
     sae = TopKSparseAutoencoder(
         d_model=cfg.pipeline.d_model,
+        d_sae=cfg.sae.d_sae if hasattr(cfg.sae, 'd_sae') else None,
         expansion_factor=cfg.sae.expansion_factor,
         k=cfg.sae.k
     ).to(device)
@@ -49,7 +50,11 @@ def train_sae(cfg: DictConfig):
         
         for file_path in act_files:
             # Load a chunk of activations into RAM
-            activations = torch.load(file_path, map_location="cpu")
+            payload = torch.load(file_path, map_location="cpu")
+            if isinstance(payload, dict) and "acts" in payload:
+                activations = payload["acts"].float()
+            else:
+                activations = payload.float()
             
             # Create a DataLoader for this specific chunk
             dataset = TensorDataset(activations)

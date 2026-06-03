@@ -27,8 +27,10 @@ def analyze_neurons(cfg: DictConfig):
     ).to(device)
     model.eval()
 
+    checkpoint_root = getattr(cfg, 'checkpoints', None)
+    checkpoint_root = checkpoint_root.dir if checkpoint_root and hasattr(checkpoint_root, 'dir') else cfg.output_dir
     # 2. Load the Trained Sparse Autoencoder
-    sae_path = os.path.join(cfg.checkpoints.dir if hasattr(cfg, 'checkpoints') else cfg.output_dir, "sae_final_weights.pt")
+    sae_path = os.path.join(checkpoint_root, "sae_final.pt")
     if not os.path.exists(sae_path):
         raise FileNotFoundError(f"Trained SAE not found at {sae_path}. Run train_sae.py first.")
 
@@ -123,8 +125,10 @@ def analyze_neurons(cfg: DictConfig):
                 for val, token in activations
             ]
 
-    os.makedirs(cfg.outputs.dir if hasattr(cfg, 'outputs') else cfg.output_dir, exist_ok=True)
-    save_path = os.path.join(cfg.outputs.dir if hasattr(cfg, 'outputs') else cfg.output_dir, f"neuron_analysis_{cfg.quantization.bits}bit.json")
+    output_root = getattr(cfg, 'outputs', None)
+    output_root = output_root.dir if output_root and hasattr(output_root, 'dir') else cfg.output_dir
+    os.makedirs(output_root, exist_ok=True)
+    save_path = os.path.join(output_root, f"neuron_analysis_{cfg.quantization.bits}bit.json")
     
     with open(save_path, "w", encoding="utf-8") as f:
         json.dump(formatted_results, f, indent=4, ensure_ascii=False)

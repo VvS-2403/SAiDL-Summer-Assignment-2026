@@ -7,16 +7,17 @@ class TopKSparseAutoencoder(nn.Module):
     A Top-k Sparse Autoencoder (SAE) designed to extract monosemantic features 
     from the dense activation stream of a pre-trained Transformer.
     """
-    def __init__(self, d_model: int, expansion_factor: int = 4, k: int = 32):
+    def __init__(self, d_model: int, d_sae: int | None = None, expansion_factor: int = 4, k: int = 32):
         """
         Args:
             d_model (int): The residual stream dimension of the target model (e.g., 768 for distilgpt2).
+            d_sae (int | None): The exact SAE bottleneck dimension. If not provided, uses d_model * expansion_factor.
             expansion_factor (int): How much larger the SAE feature space is compared to d_model.
             k (int): The strict number of neurons allowed to fire per token.
         """
         super().__init__()
         self.d_model = d_model
-        self.d_sae = d_model * expansion_factor
+        self.d_sae = d_sae if d_sae is not None else d_model * expansion_factor
         self.k = k
         
         # Pre-encoder bias (centers the activations before processing)
