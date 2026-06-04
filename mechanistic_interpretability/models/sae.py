@@ -55,19 +55,16 @@ class TopKSparseAutoencoder(nn.Module):
         # 1. Shift the activations by the geometric center
         x_centered = x - self.b_dec
         
-        # 2. Encode to the high-dimensional space
-        pre_acts = self.encoder(x_centered)
+        # 2. Encode to the high-dimensional space and apply a non-negative activation.
+        pre_acts = F.relu(self.encoder(x_centered))
         
         # 3. Top-k Routing (The Core Sparsity Mechanism)
-        # Find the 'k' largest activation values and their specific indices
+        # Find the 'k' largest non-negative activation values and their specific indices.
         topk_vals, topk_indices = torch.topk(pre_acts, self.k, dim=-1)
         
-        # Create a blank tensor of exactly zeroes
+        # Create a blank tensor of exactly zeroes and scatter the top-k values.
         feature_acts = torch.zeros_like(pre_acts)
-        
-        # Scatter the top-k values back into their original index positions.
-        # We apply ReLU here to ensure features represent positive geometric directions.
-        feature_acts.scatter_(-1, topk_indices, F.relu(topk_vals))
+        feature_acts.scatter_(-1, topk_indices, topk_vals)
         
         # 4. Reconstruct the original embedding
         x_reconstructed = self.decoder(feature_acts) + self.b_dec

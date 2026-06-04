@@ -65,6 +65,14 @@ def train_sae(cfg: DictConfig):
             for batch in progress_bar:
                 # x shape: (batch_size, d_model)
                 x = batch[0].to(device)
+
+                if global_step == 0:
+                    wandb.log({
+                        "train/activation_mean": x.mean().item(),
+                        "train/activation_std": x.std().item(),
+                        "train/k_value": cfg.sae.k,
+                    })
+                    print(f"Activation stats: mean={x.mean().item():.6f}, std={x.std().item():.6f}, k={cfg.sae.k}")
                 
                 # Forward Pass
                 x_reconstructed, feature_acts, l2_loss = sae(x)
