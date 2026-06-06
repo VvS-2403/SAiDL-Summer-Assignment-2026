@@ -252,6 +252,9 @@ def main(cfg: DictConfig):
     os.chdir(os.path.dirname(os.path.abspath(__file__)) + "/../..")
     sys.path.insert(0, os.getcwd())
 
+    from core_ml.utils.helpers import set_seed
+    set_seed(cfg.get("seed", 42))
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
     print(f"Attention: {cfg.attention.name}  |  Positional: {cfg.positional.name}  |  Model: {cfg.model.name}")
@@ -282,6 +285,23 @@ def main(cfg: DictConfig):
     if device.type == "cuda" and hasattr(torch, "compile"):
         print("Optimizing execution graphs via torch.compile()...")
         model = torch.compile(model)
+
+    if cfg.training.get("eval_only", False):
+        ckpt = cfg.training.get("resume_from", None)
+        if ckpt and os.path.exists(str(ckpt)):
+            state = torch.load(str(ckpt), map_location=device)
+            model.load_state_dict(state)
+            print(f"Loaded checkpoint from {ckpt}")
+        else:
+            print("WARNING: eval_only=True but no valid resume_from path. Using random init.")
+        _, val_loader = prepare_dataloaders(cfg)
+        dummy_opt = optim.SGD(model.parameters(), lr=0.0)
+        dummy_sched = LambdaLR(dummy_opt, lambda s: 1.0)
+        trainer = Trainer(model, None, val_loader, dummy_opt, dummy_sched, cfg, device)
+        val_loss, val_ppl = trainer.evaluate()
+        print(f"val_perplexity={val_ppl:.4f}")
+        wandb.finish()
+        return
 
     # ── Optimiser + scheduler ─────────────────────────────────────────────────
     # Create AdamW optimizer. Some PyTorch builds (Colab) don't accept the

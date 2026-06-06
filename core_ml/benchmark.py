@@ -174,8 +174,9 @@ def main(cfg: DictConfig):
     n_params = sum(p.numel() for p in model.parameters()) / 1e6
 
     # Try to load best checkpoint if it exists
-    ckpt_candidates = glob.glob(
-        os.path.join("outputs", "**", "best_model.pt"), recursive=True
+    ckpt_candidates = (
+        glob.glob(os.path.join("outputs", "**", "best_model.pt"), recursive=True) +
+        glob.glob(os.path.join("experiments", "**", "best_model.pt"), recursive=True)
     )
     if ckpt_candidates:
         ckpt_path = sorted(ckpt_candidates)[-1]
