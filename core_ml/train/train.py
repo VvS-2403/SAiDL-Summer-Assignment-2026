@@ -186,6 +186,17 @@ def build_model(cfg: DictConfig) -> nn.Module:
     kernel_size = hybrid_cfg.get("conv_kernel_size", 3)      if is_hybrid else 3
 
     # ── 3. Build blocks ───────────────────────────────────────────────────────
+    # ── This is the corrected block-building section for core_ml/train/train.py ──
+# Replace the entire "Build blocks" section (the for loop) with this.
+#
+# Changes vs original:
+#   - ConvBeforeAttnBlock now receives `n_layers=n_layers` (was missing → BUG 3/6 masked)
+#   - GatedConvFFNBlock now receives `n_layers=n_layers` (was missing)
+#   - PureConvBlock now receives `n_layers=n_layers` (was missing)
+#
+# Paste this into core_ml/train/train.py replacing the `for layer_idx in range(n_layers):` block.
+
+    # ── 3. Build blocks ───────────────────────────────────────────────────────
     blocks = []
     for layer_idx in range(n_layers):
         attn = _build_attention(cfg)
@@ -200,7 +211,9 @@ def build_model(cfg: DictConfig) -> nn.Module:
 
         elif hybrid_type == "conv_before_attn":
             block = ConvBeforeAttnBlock(
-                d_model, attn, ffn, dropout,
+                d_model, attn, ffn,
+                n_layers=n_layers,          # ← was missing; needed for init
+                dropout=dropout,
                 kernel_size=kernel_size,
                 alibi=block_alibi,
                 rope=block_rope,
@@ -208,7 +221,9 @@ def build_model(cfg: DictConfig) -> nn.Module:
 
         elif hybrid_type == "gated_conv_ffn":
             block = GatedConvFFNBlock(
-                d_model, attn, d_ff, dropout,
+                d_model, attn, d_ff,
+                n_layers=n_layers,          # ← was missing; needed for scaled init
+                dropout=dropout,
                 kernel_size=kernel_size,
                 alibi=block_alibi,
                 rope=block_rope,
@@ -216,7 +231,12 @@ def build_model(cfg: DictConfig) -> nn.Module:
 
         elif hybrid_type == "interleaved":
             if layer_idx % 2 == 0:
-                block = PureConvBlock(d_model, d_ff, kernel_size, dropout)
+                block = PureConvBlock(
+                    d_model, d_ff,
+                    n_layers=n_layers,      # ← was missing; needed for FFN init
+                    kernel_size=kernel_size,
+                    dropout=dropout,
+                )
             else:
                 block = TransformerBlock(
                     d_model, attn, ffn, dropout,
